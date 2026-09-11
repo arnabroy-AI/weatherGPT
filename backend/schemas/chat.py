@@ -21,6 +21,12 @@ class ChatRequest(BaseModel):
         description="Optional location context (city, district, or lat,lon).",
         examples=["Mumbai"],
     )
+    language: Optional[str] = Field(
+        default="en-IN",
+        max_length=10,
+        description="BCP-47 language code for the reply (default en-IN).",
+        examples=["hi-IN"],
+    )
 
     model_config = {
         "json_schema_extra": {
@@ -42,4 +48,9 @@ class ChatResponse(BaseModel):
         default="Green",
         description="IMD-style alert level: Green, Yellow, Orange, or Red.",
         examples=["Green"],
+    )
+    language: str = Field(
+        default="en-IN",
+        description="BCP-47 language code the reply is written in, echoed from the request.",
+        examples=["hi-IN"],
     )
