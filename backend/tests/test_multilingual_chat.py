@@ -12,6 +12,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
+from main import app
 from services import agent as agent_module
 from services import sarvam_client
 from services.multilingual import process_multilingual_chat
@@ -162,3 +163,55 @@ def test_multilingual_english_passthrough_uses_frozen_core(sarvam_key):
     assert result["reply"] == CANNED_ENGLISH_REPLY
     assert result["alert_level"] == "Green"
     assert result["language"] == "en-IN"
+
+
+def _route_client():
+    transport = httpx.ASGITransport(app=app)
+    return httpx.AsyncClient(transport=transport, base_url="http://test")
+
+
+async def test_route_hindi_round_trip_preserves_digits(sarvam_key):
+    """POST Devanagari + hi-IN flows route -> orchestration -> mocked
+    Sarvam + mocked agent; Hindi reply keeps 29.5 byte-identical."""
+    calls: list = []
+    sarvam_client.set_transport(_translate_transport(calls))
+    fake = FakeExecutor(CANNED_ENGLISH_REPLY)
+    async with _route_client() as client:
+        with patch.object(agent_module, "_get_executor", return_value=fake):
+            response = await client.post(
+                "/api/chat",
+                json={"message": HINDI_QUERY, "location": "Mumbai", "language": "hi-IN"},
+            )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["language"] == "hi-IN"
+    assert body["alert_level"] == "Green"
+    assert "29.5" in body["reply"]
+
+
+async def test_route_without_language_defaults_to_english():
+    """No language field keeps the exact existing English path untouched."""
+    fake_result = {"reply": CANNED_ENGLISH_REPLY, "alert_level": "Green"}
+    async with _route_client() as client:
+        with patch("api.routes.process_chat", return_value=fake_result):
+            response = await client.post(
+                "/api/chat",
+                json={"message": "Weather in Mumbai?", "location": "Mumbai"},
+            )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["language"] == "en-IN"
+    assert body["reply"] == CANNED_ENGLISH_REPLY
+
+
+async def test_route_unsupported_language_replies_honest_english():
+    """Unknown xx-YY never crashes: HTTP 200 English reply naming hi-IN."""
+    async with _route_client() as client:
+        response = await client.post(
+            "/api/chat",
+            json={"message": HINDI_QUERY, "location": "Mumbai", "language": "xx-YY"},
+        )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["language"] == "en-IN"
+    assert "hi-IN" in body["reply"]
