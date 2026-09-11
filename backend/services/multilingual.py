@@ -14,12 +14,27 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from services import agent as agent_module
-from services.sarvam_client import translate_text
+from services.sarvam_client import CAPABILITIES, translate_text
 
 DEFAULT_LANGUAGE = "en-IN"
 
 # D-01 six-language set (canonical BCP-47 codes, shared with the route).
 SUPPORTED_LANGUAGES = ("hi-IN", "mr-IN", "ta-IN", "te-IN", "bn-IN", "as-IN")
+
+# D-02 TTS gate: Bulbul has no as-IN voice, so as-IN speak is an honest
+# error, never silent substitution. Derived from the CAPABILITIES map plus
+# English so the single source of truth stays in services/sarvam_client.py.
+TTS_SUPPORTED_LANGUAGES = tuple(
+    [code for code, caps in CAPABILITIES.items() if caps.get("tts_supported")]
+    + [DEFAULT_LANGUAGE]
+)
+
+# Honest English fallback message for as-IN speak (D-02): names the missing
+# code and every supported voice language.
+TTS_UNSUPPORTED_MESSAGE = (
+    "Voice output is not yet available for as-IN. "
+    "Supported voice languages: hi-IN mr-IN ta-IN te-IN bn-IN en-IN."
+)
 
 
 def normalize_language(language: Optional[str]) -> str:
@@ -51,6 +66,33 @@ def canonical_language(language: Optional[str]) -> str:
     raise ValueError(
         "Unsupported language. Supported codes: "
         + " ".join(SUPPORTED_LANGUAGES)
+        + "."
+    )
+
+
+def is_tts_supported(language: Optional[str]) -> bool:
+    """True when Bulbul can voice the code (five Indic voices plus en-IN)."""
+    normalized = normalize_language(language)
+    return any(normalized == code.lower() for code in TTS_SUPPORTED_LANGUAGES)
+
+
+def require_tts_supported(language: Optional[str]) -> str:
+    """Return the canonical BCP-47 voice code or raise an honest ValueError.
+
+    as-IN raises carrying the English no-voice-yet message naming every
+    supported voice language (the route translates it to as-IN when the
+    translate path is available); unknown codes raise naming voice support.
+    The route maps both to HTTP 422 — never silent substitution (D-02).
+    """
+    normalized = normalize_language(language)
+    for code in TTS_SUPPORTED_LANGUAGES:
+        if normalized == code.lower():
+            return code
+    if normalized == "as-in":
+        raise ValueError(TTS_UNSUPPORTED_MESSAGE)
+    raise ValueError(
+        "Unsupported voice language. Supported voice languages: "
+        + " ".join(TTS_SUPPORTED_LANGUAGES)
         + "."
     )
 
