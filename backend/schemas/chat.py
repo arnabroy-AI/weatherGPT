@@ -54,3 +54,35 @@ class ChatResponse(BaseModel):
         description="BCP-47 language code the reply is written in, echoed from the request.",
         examples=["hi-IN"],
     )
+
+
+class SpeakRequest(BaseModel):
+    """Incoming text-to-speech request (Phase 9, D-05 backend-only voice)."""
+
+    text: str = Field(
+        ...,
+        min_length=1,
+        max_length=2500,
+        description="Text to synthesize (Bulbul REST cap: 2500 characters).",
+        examples=["Mumbai me aaj mausam saaf rahega."],
+    )
+    language: Optional[str] = Field(
+        default="en-IN",
+        max_length=10,
+        description="BCP-47 language code for the voice (default en-IN; as-IN unsupported).",
+        examples=["hi-IN"],
+    )
+
+
+class TranscribeResponse(BaseModel):
+    """Outgoing speech-to-text result: transcript plus detected language."""
+
+    transcript: str = Field(
+        ...,
+        description="Transcribed text returned by the STT provider.",
+    )
+    language_code: str = Field(
+        default="unknown",
+        description="Detected (or requested) BCP-47 language code for the audio.",
+        examples=["hi-IN"],
+    )
