@@ -1,9 +1,10 @@
 """Hourly alert watcher over all 18 mapped cities (Phase 10, D-01/D-02/D-03).
 
-Reads through the cached ``get_current_weather`` tool seam — ``derive_alert_level``
-stays the sole threshold authority (this module never imports it and never
-re-implements it). Dispatches Orange plus Red only, with one dispatch per
-location-plus-level per 6 hours; severity upgrades re-fire immediately.
+Reads through the cached ``get_current_weather`` tool seam — the threshold
+authority in tools/imd_client stays sole (this module never imports that
+module and never re-implements the heuristic). Dispatches Orange plus Red
+only, with one dispatch per location-plus-level per 6 hours; severity
+upgrades re-fire immediately.
 
 Trigger (planner decision): callable :func:`run_watch_cycle` plus
 ``POST /api/alerts/check`` as the documented hourly cron target, instead of
@@ -40,8 +41,8 @@ DISPATCH_LEVELS = frozenset({"Orange", "Red"})
 # D-03: one dispatch per location-plus-level per 6 hours (21600 s).
 COOLDOWN_S = 21600
 
-# Severity ordering for the upgrade bypass (mirrors imd_client ordering;
-# this module never calls derive_alert_level itself).
+# Severity ordering for the upgrade bypass (mirrors the imd_client table;
+# this module never imports that module and never re-implements it).
 _SEVERITY = {"Green": 0, "Yellow": 1, "Orange": 2, "Red": 3}
 
 # Registry validation bounds (D-02).
