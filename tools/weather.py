@@ -395,9 +395,15 @@ def _fallback_trend_payload(location_display: str) -> dict:
     """Disclosed mock-shaped payload when the archive fetch fails (D-03).
 
     Never raises: stale-marked zeros plus the fallback note, mirroring the
-    current-tool outage contract. Cache hardening itself is Plan 02, so the
-    fresh path below never reads or writes the cache.
+    current-tool outage contract. Window fields stay truthful (30-day window
+    with empty dates) and both note plus advisory surface the literal
+    fallback sentence so cached, stale, and fallback states disclose alike.
+    Never stored as a fresh cache entry (T-08-05).
     """
+    note_text = (
+        f"{_FALLBACK_NOTE} Archive trend data unavailable for "
+        f"{location_display}; showing fallback values (non-IMD model data)."
+    )
     return {
         "location": location_display,
         "rain_sum_mm": 0.0,
@@ -411,8 +417,8 @@ def _fallback_trend_payload(location_display: str) -> dict:
         "window_start": "",
         "window_end": "",
         "source": "mock-climate-fallback (non-IMD model data)",
-        "note": f"{_FALLBACK_NOTE} Archive trend data unavailable for "
-        f"{location_display}; showing fallback values (non-IMD model data).",
+        "note": note_text,
+        "advisory": note_text,
         "cached": False,
         "cache_age_s": 0,
         "stale": True,
@@ -472,21 +478,52 @@ def get_climate_trends(location: str) -> str:
             location_display = _FALLBACK_CITY.title()
     latitude, longitude = coords
 
+    # D-03 cache discipline (Plan 02 hardening): tuple key namespaces trend
+    # entries away from current plain-string keys and forecast tuple keys
+    # so no collision is possible (T-08-05). Lock-guarded dict access.
+    cache_key = ("climate", lookup_key)
+
+    # Cache hit path: serve the unexpired entry with disclosure stamps.
+    now = time.monotonic()
+    with _CACHE_LOCK:
+        entry = _CACHE.get(cache_key)
+    if entry is not None and now < entry["expires"]:
+        age_s = int(now - entry["stored_at"])
+        return json.dumps(
+            _apply_trend_guess_note(_decorate_hit(entry["payload"], age_s), raw, guessed)
+        )
+
     try:
         provider_data = imd_client.fetch_archive_open_meteo(latitude, longitude)
         mapped = imd_client.map_archive_to_payload(provider_data, location_display)
     except Exception:
-        # Archive outage (D-03): disclosed mock-shaped fallback, never a
-        # crash and never silent. Log full server-side; user payload stays
+        # Archive outage (D-03): exact parity with the current path.
+        # Serve the expired entry stamped stale when one exists, else the
+        # mock-shaped trend fallback. Neither branch is stored as a fresh
+        # entry (T-08-05). Log full server-side; user payload stays
         # sanitized (no keys, URLs, or tracebacks).
         logger.exception("get_climate_trends archive fetch failed")
+        with _CACHE_LOCK:
+            stale_entry = _CACHE.get(cache_key)
+        if stale_entry is not None:
+            age_s = int(time.monotonic() - stale_entry["stored_at"])
+            return json.dumps(
+                _apply_trend_guess_note(
+                    _decorate_stale(stale_entry["payload"], age_s), raw, guessed
+                )
+            )
         return json.dumps(
             _apply_trend_guess_note(_fallback_trend_payload(location_display), raw, guessed)
         )
 
-    # Fresh success only (no cache in this tracer; hardening is Plan 02).
-    payload = dict(mapped)
-    payload["cached"] = False
-    payload["cache_age_s"] = 0
-    payload["stale"] = False
-    return json.dumps(_apply_trend_guess_note(payload, raw, guessed))
+    # Fresh success only: store the base payload (no disclosure stamps
+    # stored), then return it stamped fresh. Fallbacks never reach this store.
+    stored_at = time.monotonic()
+    base_payload = dict(mapped)
+    with _CACHE_LOCK:
+        _CACHE[cache_key] = {
+            "expires": stored_at + CACHE_TTL_S,
+            "stored_at": stored_at,
+            "payload": base_payload,
+        }
+    return json.dumps(_apply_trend_guess_note(_decorate_fresh(base_payload), raw, guessed))

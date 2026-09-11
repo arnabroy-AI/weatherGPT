@@ -178,3 +178,168 @@ def test_archive_outage_yields_stamped_fallback():
     data = json.loads(raw)
     assert "mock" in data["source"]
     assert data["stale"] is True
+
+
+def _counting_archive_transport(counter: dict) -> httpx.MockTransport:
+    """Archive fixture transport that counts upstream hits (MockTransport only)."""
+    fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        counter["hits"] += 1
+        return httpx.Response(200, json=fixture)
+
+    return httpx.MockTransport(handler)
+
+
+def test_trend_cache_hit_single_transport_hit(mock_archive):
+    """Two identical trend invokes hit upstream once; second is cached (D-03)."""
+    import time  # noqa: F401  (keeps parity with current-path cache tests)
+
+    from tools import weather as weather_mod
+
+    assert weather_mod.CACHE_TTL_S == 600
+    counter = {"hits": 0}
+    imd_client.set_transport(_counting_archive_transport(counter))
+    try:
+        raw1 = get_climate_trends.invoke({"location": "Pune"})
+        raw2 = get_climate_trends.invoke({"location": "Pune"})
+    finally:
+        imd_client.reset_transport()
+    first = json.loads(raw1)
+    second = json.loads(raw2)
+
+    assert counter["hits"] == 1, f"expected 1 upstream call, got {counter['hits']}"
+    assert first["cached"] is False
+    assert first["cache_age_s"] == 0
+    assert first["stale"] is False
+    assert second["cached"] is True
+    assert isinstance(second["cache_age_s"], int) and second["cache_age_s"] >= 0
+    assert second["stale"] is False
+    assert second["rain_sum_mm"] == first["rain_sum_mm"] == 157.2
+    assert second["window_days"] == 30
+    assert "non-IMD" in second["source"]
+    # Tuple key namespaces trend entries away from current plain-string keys.
+    with weather_mod._CACHE_LOCK:
+        assert ("climate", "pune") in weather_mod._CACHE
+        assert "pune" not in weather_mod._CACHE
+
+
+def test_trend_ttl_expiry_forces_refetch(mock_archive):
+    """A pre-seeded expired trend entry forces a refetch on next query."""
+    import time
+
+    from tools import weather as weather_mod
+
+    fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    base = imd_client.map_archive_to_payload(fixture, "Pune")
+    now = time.monotonic()
+    with weather_mod._CACHE_LOCK:
+        weather_mod._CACHE[("climate", "pune")] = {
+            "expires": now - 1.0,
+            "stored_at": now - 700.0,
+            "payload": base,
+        }
+    counter = {"hits": 0}
+    imd_client.set_transport(_counting_archive_transport(counter))
+    try:
+        raw = get_climate_trends.invoke({"location": "Pune"})
+    finally:
+        imd_client.reset_transport()
+    data = json.loads(raw)
+
+    assert counter["hits"] == 1, f"expired entry must refetch, got {counter['hits']}"
+    assert data["cached"] is False
+    assert data["cache_age_s"] == 0
+    assert data["stale"] is False
+    assert "non-IMD" in data["source"]
+
+
+def test_trend_stale_serve_on_outage():
+    """Expired trend entry plus dead archive serves stamped stale, never a raise."""
+    import time
+
+    from tools import weather as weather_mod
+
+    fixture = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
+    base = imd_client.map_archive_to_payload(fixture, "Pune")
+    now = time.monotonic()
+    with weather_mod._CACHE_LOCK:
+        weather_mod._CACHE[("climate", "pune")] = {
+            "expires": now - 1.0,
+            "stored_at": now - 700.0,
+            "payload": base,
+        }
+
+    def _failing(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("archive unreachable")
+
+    imd_client.set_transport(httpx.MockTransport(_failing))
+    try:
+        raw = get_climate_trends.invoke({"location": "Pune"})
+    finally:
+        imd_client.reset_transport()
+    data = json.loads(raw)
+
+    assert data["cached"] is True
+    assert data["stale"] is True
+    assert data["source"].endswith("+stale-fallback")
+    assert "non-IMD" in data["source"]
+    assert (
+        "Note: live data unavailable; showing fallback values." in data["advisory"]
+    )
+    assert data["window_days"] == 30
+    assert data["rain_sum_mm"] == 157.2
+    # Stale payloads are never stored as fresh: a healthy retry refetches.
+    counter = {"hits": 0}
+    imd_client.set_transport(_counting_archive_transport(counter))
+    try:
+        retry = json.loads(get_climate_trends.invoke({"location": "Pune"}))
+    finally:
+        imd_client.reset_transport()
+    assert counter["hits"] == 1, "stale serve must not refresh the cache"
+    assert retry["cached"] is False
+    assert retry["stale"] is False
+
+
+def test_trend_empty_cache_fallback_disclosure():
+    """Empty-cache outage yields a mock-shaped 30-day fallback with disclosure."""
+    from tools import weather as weather_mod
+
+    def _failing(request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("archive unreachable")
+
+    imd_client.set_transport(httpx.MockTransport(_failing))
+    try:
+        raw = get_climate_trends.invoke({"location": "Pune"})
+    finally:
+        imd_client.reset_transport()
+    data = json.loads(raw)
+
+    assert data["window_days"] == 30
+    assert "mock" in data["source"]
+    assert "non-IMD" in data["source"]
+    assert (
+        "Note: live data unavailable; showing fallback values." in data["note"]
+    )
+    assert (
+        "Note: live data unavailable; showing fallback values."
+        in data["advisory"]
+    )
+    assert data["rain_sum_mm"] == 0.0
+    assert data["window_start"] == ""
+    assert data["window_end"] == ""
+    assert "Trend data unavailable" in data["deviation_note"]
+    assert data["cached"] is False
+    assert data["stale"] is True
+    # Fallback is never stored as fresh: a healthy retry refetches exactly once.
+    counter = {"hits": 0}
+    imd_client.set_transport(_counting_archive_transport(counter))
+    try:
+        retry = json.loads(get_climate_trends.invoke({"location": "Pune"}))
+    finally:
+        imd_client.reset_transport()
+    assert counter["hits"] == 1, "fallback must not pin the cache"
+    assert retry["cached"] is False
+    assert retry["rain_sum_mm"] == 157.2
+    with weather_mod._CACHE_LOCK:
+        assert ("climate", "pune") in weather_mod._CACHE
