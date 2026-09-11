@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     # --- Required secrets (loaded from .env, never hardcoded) ---
     OPENROUTER_API_KEY: str = ""
     WEATHER_API_KEY: str = ""
+    SARVAM_API_KEY: str = ""
+    FCM_SERVICE_ACCOUNT_FILE: str = "fcm-service-account.json"
 
     # --- Demo hardening (Phase 7, D-06): env-gated, local-dev open by default ---
     CORS_ALLOW_ORIGINS: str = ""
