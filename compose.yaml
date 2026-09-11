@@ -1,0 +1,25 @@
+# WeatherGPT SIH demo pair (D-02): backend (uvicorn) + frontend (Next.js
+# standalone). Keys arrive at runtime only via the host .env file (D-03) —
+# never baked into images, never inline here (T-07-04). Compose logs stay
+# key-free: no key echo in this file or in command lines (T-07-05).
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_WEATHERGPT_API: ${NEXT_PUBLIC_WEATHERGPT_API:-http://localhost:8000}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend

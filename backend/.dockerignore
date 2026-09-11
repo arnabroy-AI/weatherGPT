@@ -1,0 +1,15 @@
+# Never bake keys or local env files into images (D-03).
+.env
+.env.local
+
+# Dependencies / bytecode rebuilt inside the image.
+node_modules
+__pycache__
+*.pyc
+
+# Planning bulk and VCS metadata stay out of build context.
+.planning
+.git
+
+# Test caches.
+.pytest_cache/
