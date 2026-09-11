@@ -8,7 +8,9 @@ from starlette.concurrency import run_in_threadpool
 
 from core.config import get_settings
 from api.throttle import check_rate_limit
+from schemas.alerts import CheckResponse, SendRequest, StatusResponse, SubscribeRequest
 from schemas.chat import ChatRequest, ChatResponse, SpeakRequest, TranscribeResponse
+from services import alert_watcher, fcm_client
 from services.agent import process_chat
 from services.multilingual import (
     DEFAULT_LANGUAGE,
@@ -300,3 +302,203 @@ async def voice_speak(payload: SpeakRequest, request: Request) -> Response:
         ) from exc
 
     return Response(content=audio_bytes, media_type="audio/wav")
+
+
+def _check_alerts_throttle(request: Request, client_ip: str) -> None:
+    """Enforce the same per-IP sliding-window throttle on alert routes."""
+    allowed, retry_after = check_rate_limit(client_ip)
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=sanitize_detail(
+                "Rate limit exceeded. Please retry after a short pause."
+            ),
+            headers={"Retry-After": str(retry_after)},
+        )
+
+
+@router.post(
+    "/alerts/subscribe",
+    status_code=status.HTTP_200_OK,
+    summary="Subscribe a device token to alert topics",
+)
+async def alerts_subscribe(payload: SubscribeRequest, request: Request) -> dict:
+    """Register a token against topics; echo only the last 6 chars."""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_alerts_throttle(request, client_ip)
+    try:
+        result = alert_watcher.subscribe(payload.token, payload.topics)
+        counts = alert_watcher.registry_counts()
+    except ValueError as exc:
+        logger.exception(
+            "Alert subscribe request failed with ValueError at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=sanitize_detail(str(exc)),
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive catch-all
+        logger.exception(
+            "Alert subscribe request failed unexpectedly at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=sanitize_detail("Unexpected error: request failed."),
+        ) from exc
+    return {
+        "token_suffix": result["token_suffix"],
+        "topics": result["topics"],
+        "tokens": counts["tokens"],
+        "subscribed_topics": counts["topics"],
+        "subscriptions": counts["subscriptions"],
+    }
+
+
+@router.post(
+    "/alerts/send",
+    status_code=status.HTTP_200_OK,
+    summary="Direct-send an Orange/Red alert",
+)
+async def alerts_send(payload: SendRequest, request: Request) -> dict:
+    """Send one alert to exactly one target; Green/Yellow never push."""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_alerts_throttle(request, client_ip)
+    has_token = bool((payload.token or "").strip())
+    has_topic = bool((payload.topic or "").strip())
+    try:
+        if has_token == has_topic:
+            raise ValueError("Provide exactly one of token or topic.")
+        level = (payload.alert_level or "").strip()
+        if level not in ("Orange", "Red"):
+            raise ValueError(
+                "Only Orange and Red alerts may be pushed; "
+                "Green and Yellow never push."
+            )
+        account = fcm_client.load_service_account()
+        if account is None:
+            raise RuntimeError(
+                "FCM dispatch failure: FCM is not configured. "
+                "Set FCM_SERVICE_ACCOUNT_FILE to a valid service-account "
+                "JSON file."
+            )
+        location = (payload.location or "Mumbai").strip() or "Mumbai"
+        if has_token:
+            name = await run_in_threadpool(
+                fcm_client.send_to_token,
+                (payload.token or "").strip(),
+                payload.title,
+                payload.body,
+                level,
+                location,
+            )
+            target = "token"
+        else:
+            name = await run_in_threadpool(
+                fcm_client.send_to_topic,
+                (payload.topic or "").strip(),
+                payload.title,
+                payload.body,
+                level,
+                location,
+            )
+            target = "topic"
+    except ValueError as exc:
+        logger.exception(
+            "Alert send request failed with ValueError at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=sanitize_detail(str(exc)),
+        ) from exc
+    except RuntimeError as exc:
+        logger.exception(
+            "Alert send request failed with RuntimeError at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=sanitize_detail(str(exc)),
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive catch-all
+        logger.exception(
+            "Alert send request failed unexpectedly at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=sanitize_detail("Unexpected error: request failed."),
+        ) from exc
+    return {
+        "message_name": name,
+        "alert_level": level,
+        "location": location,
+        "target": target,
+    }
+
+
+@router.post(
+    "/alerts/check",
+    response_model=CheckResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Hourly watcher cron target",
+)
+async def alerts_check(request: Request) -> CheckResponse:
+    """Run the 18-city watch cycle server-side (hourly cron target)."""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_alerts_throttle(request, client_ip)
+    try:
+        report = await run_in_threadpool(alert_watcher.run_watch_cycle)
+    except RuntimeError as exc:
+        logger.exception(
+            "Alert check request failed with RuntimeError at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=sanitize_detail(str(exc)),
+        ) from exc
+    except Exception as exc:  # pragma: no cover - defensive catch-all
+        logger.exception(
+            "Alert check request failed unexpectedly at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=sanitize_detail("Unexpected error: request failed."),
+        ) from exc
+    return CheckResponse(
+        checked=int(report.get("checked", 0)),
+        dispatched=list(report.get("dispatched", [])),
+        skipped=list(report.get("skipped", [])),
+    )
+
+
+@router.get(
+    "/alerts/status",
+    response_model=StatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Alert watcher operability snapshot",
+)
+async def alerts_status(request: Request) -> StatusResponse:
+    """Return watch counts plus the FCM-configured flag; zero token bytes."""
+    client_ip = request.client.host if request.client else "unknown"
+    _check_alerts_throttle(request, client_ip)
+    try:
+        counts = alert_watcher.registry_counts()
+        try:
+            configured = fcm_client.load_service_account() is not None
+        except Exception:
+            logger.exception("Alert status service-account probe failed")
+            configured = False
+    except Exception as exc:  # pragma: no cover - defensive catch-all
+        logger.exception(
+            "Alert status request failed unexpectedly at %s", request.url.path
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=sanitize_detail("Unexpected error: request failed."),
+        ) from exc
+    return StatusResponse(
+        watch_cities=len(alert_watcher.WATCH_CITIES),
+        cooldown_hours=int(alert_watcher.COOLDOWN_S // 3600),
+        tokens=int(counts.get("tokens", 0)),
+        topics=int(counts.get("topics", 0)),
+        subscriptions=int(counts.get("subscriptions", 0)),
+        fcm_configured=bool(configured),
+    )
