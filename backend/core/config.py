@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     WEATHER_API_KEY: str = ""
     SARVAM_API_KEY: str = ""
     FCM_SERVICE_ACCOUNT_FILE: str = "fcm-service-account.json"
+    FCM_SERVICE_ACCOUNT_JSON: str = ""
 
     # --- Demo hardening (Phase 7, D-06): env-gated, local-dev open by default ---
     CORS_ALLOW_ORIGINS: str = ""

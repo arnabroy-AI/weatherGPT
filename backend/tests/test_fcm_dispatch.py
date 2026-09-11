@@ -199,3 +199,13 @@ def test_empty_topic_raises_value_error(tmp_path, monkeypatch):
     _inject_fake_auth(monkeypatch)
     with pytest.raises(ValueError):
         fcm_client.send_to_topic("", "t", "b")
+
+
+def test_inline_json_wins_over_missing_file(tmp_path, monkeypatch):
+    """Render path: FCM_SERVICE_ACCOUNT_JSON parses when the file is absent."""
+    account = _fake_service_account()
+    monkeypatch.setenv("FCM_SERVICE_ACCOUNT_JSON", json.dumps(account))
+    monkeypatch.setenv("FCM_SERVICE_ACCOUNT_FILE", str(tmp_path / "does-not-exist.json"))
+    get_settings.cache_clear()
+    loaded = fcm_client.load_service_account()
+    assert loaded == account

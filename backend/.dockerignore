@@ -1,6 +1,8 @@
 # Never bake keys or local env files into images (D-03).
 .env
 .env.local
+fcm-service-account.json
+*-firebase-adminsdk-*.json
 
 # Dependencies / bytecode rebuilt inside the image.
 node_modules

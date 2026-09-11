@@ -49,14 +49,23 @@
 - [ ] **CLIM-02**: Trend replies disclose the observation window + non-IMD model-data sourcing, reusing the Phase 2 disclosure voice
 - [ ] **CLIM-03**: Landing shows a compact climate strip (reuse showcase pattern, real copy, zero lorem) surfacing the trends capability
 
+### Multilingual voice + chat (added 2026-09-11, Sarvam key live)
+
+- [ ] **MULT-01**: User can chat in Hindi + 2–3 regional languages (Sarvam translate, reply in user's language)
+- [ ] **VOIC-01**: User can use voice input (Sarvam STT) and voice output (Sarvam TTS) in supported languages
+
+### Proactive push alerts (added 2026-09-11, FCM credential live)
+
+- [ ] **NOTF-01**: Backend can dispatch FCM push for Orange/Red alerts (service-account auth, topic + token targeting, key-free logs)
+- [ ] **NOTF-02**: Threshold watcher evaluates latest data on a schedule and triggers NOTF-01 dispatch (in-process scheduler, no duplicate storms)
+
 ## v2 Requirements
 
 ### Nice to have
 
-- **MULT-01**: User can chat in Hindi + 2–3 regional languages
-- **VOIC-01**: User can use voice input/output
 - **MAPS-01**: User sees radar/satellite map overlays and severe-weather push alerts
 - **AUTH-01**: Saved locations + alert subscriptions with accounts
+- SMS/WhatsApp dispatch: needs provider key + DLT registration (deferred until credentials land)
 
 ## Out of Scope
 
@@ -64,7 +73,6 @@
 |---------|--------|
 | Native mobile app | Web-first; SIH demo is browser-based |
 | OAuth / accounts in v1 | No auth needed for demo value |
-| Real-time push notifications | Needs infra + subscriptions; v2 |
 | Non-IMD global data in v1 | MoES/IMD authenticity is the judging criterion |
 
 ## Traceability
@@ -94,10 +102,14 @@
 | CLIM-01 | Phase 8 | Pending |
 | CLIM-02 | Phase 8 | Pending |
 | CLIM-03 | Phase 8 | Pending |
+| MULT-01 | Phase 9 | Pending |
+| VOIC-01 | Phase 9 | Pending |
+| NOTF-01 | Phase 10 | Pending |
+| NOTF-02 | Phase 10 | Pending |
 
 **Coverage:**
-- v1 requirements: 23 total
-- Mapped to phases: 23
+- v1 requirements: 27 total
+- Mapped to phases: 27
 - Unmapped: 0 ✓
 
 ---

@@ -121,11 +121,11 @@ describe("chat wire contract (frontend <-> frozen backend)", () => {
     }
   });
 
-  it("timeout is 10000ms via AbortController", () => {
+  it("timeout is 90000ms via AbortController", () => {
     assert.match(
       clientSrc,
-      /CHAT_TIMEOUT_MS\s*=\s*10000/,
-      "CHAT_TIMEOUT_MS equals 10000",
+      /CHAT_TIMEOUT_MS\s*=\s*90000/,
+      "CHAT_TIMEOUT_MS equals 90000",
     );
     assert.match(clientSrc, /AbortController/, "client uses AbortController");
   });

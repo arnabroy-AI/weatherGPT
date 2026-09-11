@@ -1,0 +1,28 @@
+# Render blueprint for the WeatherGPT backend (Docker runtime).
+# Apply: push this repo to GitHub, then Render dashboard → New → Blueprint
+# → select the repo. Fill the `sync: false` values in the dashboard
+# (never commit keys). Frontend (Vercel) must match CORS_ALLOW_ORIGINS.
+services:
+  - type: web
+    name: weathergpt-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /health
+    plan: starter
+    envVars:
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: WEATHER_API_KEY
+        sync: false
+      # Paste the ENTIRE fcm-service-account.json content as one line.
+      # Inline JSON wins over FCM_SERVICE_ACCOUNT_FILE (no file upload on Render).
+      - key: FCM_SERVICE_ACCOUNT_JSON
+        sync: false
+      # Set to your frontend origin, e.g. https://weathergpt.vercel.app
+      - key: CORS_ALLOW_ORIGINS
+        sync: false
+      - key: PYTHONUNBUFFERED
+        value: "1"

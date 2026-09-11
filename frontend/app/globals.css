@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * WeatherGPT glassmorphism token system (D-05/D-06 per 05-UI-SPEC.md).
+ * Accent: deep teal #0f7667 (dark #2dd4bf). Warm highlight: amber #d97706 (dark #fbbf24).
+ * Page: slate-50 light / slate-950 dark. Glass: white 0.70 light / slate-900 0.60 dark.
+ * Blur: cards 12px, header 8px, hero panel 16px. Radius: cards 16px, buttons 10px, chips full.
+ * Shadows: light 0 8px 32px rgba(15,23,42,0.08), dark 0 8px 32px rgba(0,0,0,0.40).
+ * Hero-only teal radial wash: rgba(15,118,103,0.08) light / rgba(45,212,191,0.06) dark.
+ * Solid slate surfaces elsewhere — no purple-blue gradient anywhere.
+ */
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 174 72% 26%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 174 72% 26%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 174 72% 26%;
+    --radius: 0.625rem;
+    --weathergpt-teal: #0f7667;
+    --weathergpt-amber: #d97706;
+    --weathergpt-glass-fill: rgba(255, 255, 255, 0.7);
+    --weathergpt-glass-border: rgba(15, 23, 42, 0.08);
+    --weathergpt-glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+    --weathergpt-hero-wash: rgba(15, 118, 103, 0.08);
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 172 66% 50%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 172 66% 50%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 172 66% 50%;
+    --weathergpt-teal: #2dd4bf;
+    --weathergpt-amber: #fbbf24;
+    --weathergpt-glass-fill: rgba(15, 23, 42, 0.6);
+    --weathergpt-glass-border: rgba(255, 255, 255, 0.1);
+    --weathergpt-glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --weathergpt-hero-wash: rgba(45, 212, 191, 0.06);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--weathergpt-teal);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background-color: var(--weathergpt-glass-fill);
+    border: 1px solid var(--weathergpt-glass-border);
+    @apply backdrop-blur-md rounded-2xl;
+    box-shadow: var(--weathergpt-glass-shadow);
+  }
+
+  .glass-header {
+    background-color: var(--weathergpt-glass-fill);
+    border-bottom: 1px solid var(--weathergpt-glass-border);
+    @apply backdrop-blur-sm;
+  }
+
+  .glass-hero-panel {
+    background-color: var(--weathergpt-glass-fill);
+    border: 1px solid var(--weathergpt-glass-border);
+    @apply backdrop-blur-lg rounded-2xl;
+    box-shadow: var(--weathergpt-glass-shadow);
+  }
+
+  .hero-wash {
+    background: radial-gradient(
+      ellipse 80% 60% at 50% 40%,
+      var(--weathergpt-hero-wash),
+      transparent
+    );
+  }
+
+  .kicker {
+    @apply text-sm font-semibold uppercase;
+    letter-spacing: 0.08em;
+    color: var(--weathergpt-amber);
+  }
+
+  .hero-display {
+    font-size: clamp(2rem, 5vw, 2.5rem);
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+  }
+
+  .section-title {
+    font-size: 1.5rem;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-wash {
+    background: transparent;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

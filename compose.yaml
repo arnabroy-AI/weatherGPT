@@ -10,6 +10,10 @@ services:
       dockerfile: Dockerfile
     env_file:
       - ./backend/.env
+    volumes:
+      # Service-account path in backend/.env is relative (fcm-service-account.json):
+      # mount it read-only so FCM stays configured inside the container (D-03).
+      - ./backend/fcm-service-account.json:/app/fcm-service-account.json:ro
     ports:
       - "8000:8000"
 

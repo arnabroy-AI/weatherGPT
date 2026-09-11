@@ -131,3 +131,30 @@ Plans:
 ---
 *Roadmap created: 2026-09-10 | 7 phases | 20 requirements mapped | All v1 covered ✓*
 *Updated: 2026-09-11 — Phase 8 (CLIM-01…03) added for MoES climate-information gap*
+
+### Phase 9: Multilingual voice + chat (added 2026-09-11, Sarvam key live)
+**Goal:** Chat + voice in Hindi and regional languages via Sarvam
+**Mode:** mvp
+**Requirements:** MULT-01, VOIC-01
+**Success Criteria:**
+1. User sends a Hindi (Devanagari) query and gets a Hindi grounded reply (translate in/out around the frozen English agent core)
+2. Voice input (STT) + voice output (TTS) round-trip for a seeded query, mocked in CI
+3. Unsupported language / STT failure degrades gracefully in the user's language where possible, English otherwise; pytest + contract gates stay green
+**Plans:** 3 plans
+Plans:
+- [ ] 09-01-PLAN.md — Tracer: Hindi round-trip end-to-end via mocked Sarvam translate plus frozen agent core with number preservation
+- [ ] 09-02-PLAN.md — Six-language capability map plus STT/TTS clients plus voice endpoints with caps and throttle
+- [ ] 09-03-PLAN.md — Sarvam secret-safety plus coverage matrix with pins plus opt-in live test plus full gates
+
+### Phase 10: Proactive push alerts (added 2026-09-11, FCM credential live)
+**Goal:** Threshold watcher dispatches FCM push for Orange/Red alerts
+**Mode:** mvp
+**Requirements:** NOTF-01, NOTF-02
+**Success Criteria:**
+1. Orange/Red condition triggers an FCM dispatch (topic + token paths) with key-free logs; unit-proven with mocked FCM endpoint
+2. Watcher runs on schedule, dedupes repeat alerts, never storms; pytest green
+3. No secrets in code/logs; service-account file gitignored and validated at startup
+**Plans:** 2 plans
+Plans:
+- [ ] 10-01-PLAN.md — Tracer: FCM client auth seam plus token/topic send, Orange fixture over mocked FCM
+- [ ] 10-02-PLAN.md — Watcher plus registry plus alert endpoints plus dedup plus coverage matrix, full gates

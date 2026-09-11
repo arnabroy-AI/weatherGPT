@@ -1,0 +1,1 @@
+{"commit_docs": true, "granularity": "fine", "mode": "yolo", "model_profile": "adaptive", "parallelization": true, "plan_review": {"source_grounding": true}, "planning": {"commit_docs": true}, "project_mode": "mvp", "ship": {"pr_body_sections": []}, "workflow": {"nyquist_validation": true, "plan_check": true, "research": false, "verifier": true}}

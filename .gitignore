@@ -1,6 +1,8 @@
 # Secrets — never commit. See .env.example for the documented shape.
 .env
 frontend/.env*.local
+fcm-service-account.json
+*-firebase-adminsdk-*.json
 
 # Python bytecode / caches
 __pycache__/

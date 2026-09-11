@@ -112,14 +112,20 @@ def load_service_account(path: Optional[str] = None) -> Optional[Dict[str, Any]]
             missing any required field. Never echoes file contents.
     """
     resolved = path if path is not None else get_settings().FCM_SERVICE_ACCOUNT_FILE
-    candidate = Path(resolved)
-    if not candidate.is_file():
-        return None
-    try:
-        raw = candidate.read_text(encoding="utf-8")
-    except OSError as exc:
-        logger.exception("FCM service-account file unreadable")
-        raise RuntimeError("FCM dispatch failure: service-account file unreadable.") from exc
+    inline = "" if path is not None else get_settings().FCM_SERVICE_ACCOUNT_JSON.strip()
+    if inline:
+        # Hosts with no file upload (Render, etc.): inline JSON wins over the
+        # file path. Same shape validation below; never logged or echoed.
+        raw = inline
+    else:
+        candidate = Path(resolved)
+        if not candidate.is_file():
+            return None
+        try:
+            raw = candidate.read_text(encoding="utf-8")
+        except OSError as exc:
+            logger.exception("FCM service-account file unreadable")
+            raise RuntimeError("FCM dispatch failure: service-account file unreadable.") from exc
     try:
         data = json.loads(raw)
     except (ValueError, TypeError) as exc:

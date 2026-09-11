@@ -1,0 +1,30 @@
+# State: WeatherGPT
+
+## Project Reference
+
+See: `.planning/PROJECT.md` (updated 2026-09-10)
+
+**Core value:** Natural-language IMD-grounded answer + Green/Yellow/Orange/Red alert, via API and polished UI.
+**Current focus:** Phase 1 — Backend hardening (not started)
+
+## Progress
+
+- [x] Initialization — PROJECT.md, REQUIREMENTS.md, ROADMAP.md created
+- [ ] Phase 1 — Backend hardening
+- [ ] Phase 2 — IMD live data
+- [ ] Phase 3 — Forecast + alerts
+- [ ] Phase 4 — Agent upgrade
+- [ ] Phase 5 — Frontend shell + landing
+- [ ] Phase 6 — Chat UI wiring
+- [ ] Phase 7 — Demo hardening
+
+## Decisions Log
+
+- 2026-09-10: IMD API direct in v1 (authenticity over speed)
+- 2026-09-10: Vertical MVP, fine granularity (7 phases)
+- 2026-09-10: Frontend in scope — glassmorphism SaaS + shadcn + custom typography
+
+## Next
+
+`/clear` then `/gsd-discuss-phase 1` — gather context and clarify approach.
+(Phases 5–6 have UI: consider `/gsd-ui-phase 5` before planning.)

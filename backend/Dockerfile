@@ -17,4 +17,6 @@ COPY tools/ ./tools/
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Render (and most PaaS hosts) inject $PORT — honor it, defaulting to 8000
+# for local compose. Exec-form can't expand $PORT, hence sh -c.
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
